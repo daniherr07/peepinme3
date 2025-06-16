@@ -1,0 +1,111 @@
+.card {
+  background: white;
+  border: 1px solid #e1e8ed;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 10px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.header {
+  margin-bottom: 12px;
+}
+
+.storeName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0 0 4px 0;
+}
+
+.category {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.details {
+  margin-bottom: 12px;
+}
+
+.detail {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #5a6c7d;
+}
+
+.detail:last-child {
+  margin-bottom: 0;
+}
+
+.icon {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+.products {
+  border-top: 1px solid #f0f3f4;
+  padding-top: 12px;
+}
+
+.productsLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7f8c8d;
+  margin: 0 0 8px 0;
+}
+
+.productTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  background: #f8f9fa;
+  color: #495057;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid #e9ecef;
+}
+
+.moreTag {
+  background: #e9ecef;
+  color: #6c757d;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .card {
+    padding: 12px;
+  }
+
+  .storeName {
+    font-size: 15px;
+  }
+
+  .detail {
+    font-size: 12px;
+  }
+
+  .tag,
+  .moreTag {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+}
