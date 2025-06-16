@@ -1,5 +1,5 @@
 /**
- * PeepInMe Chatbot Logic - V8 (Highly Optimized Semantic Search)
+ * PeepInMe Chatbot Logic - V8.1 (Corrected Types)
  *
  * This version introduces major performance and correctness improvements:
  * 1. High-Speed Performance: The AI classifier is now called only ONCE per query.
@@ -11,7 +11,7 @@ import { pipeline, ZeroShotClassificationPipeline, FeatureExtractionPipeline, Ze
 import { dot, norm } from 'mathjs'; // Import math functions
 import storesData from '../data/stores_with_embeddings.json'; // Use the data with pre-calculated embeddings
 
-// --- TYPE DEFINITIONS (No changes needed here) ---
+// --- TYPE DEFINITIONS (No changes) ---
 interface ProductEmbedding {
   product: string;
   embedding: number[];
@@ -38,44 +38,32 @@ export interface ChatbotResponse {
   storeGroups?: StoreGroup[];
 }
 
-// --- AI MODEL MANAGEMENT (Singleton for multiple models) ---
+// --- AI MODEL MANAGEMENT (No changes) ---
 class AIModels {
   private static classifier: Promise<ZeroShotClassificationPipeline> | null = null;
   private static extractor: Promise<FeatureExtractionPipeline> | null = null;
-
   static async getClassifier(): Promise<ZeroShotClassificationPipeline> {
-    if (this.classifier === null) {
-      this.classifier = pipeline('zero-shot-classification', 'Xenova/bart-large-mnli') as Promise<ZeroShotClassificationPipeline>;
-    }
+    if (this.classifier === null) this.classifier = pipeline('zero-shot-classification', 'Xenova/bart-large-mnli') as Promise<ZeroShotClassificationPipeline>;
     return this.classifier;
   }
-  
   static async getExtractor(): Promise<FeatureExtractionPipeline> {
-    if (this.extractor === null) {
-      this.extractor = pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2') as Promise<FeatureExtractionPipeline>;
-    }
+    if (this.extractor === null) this.extractor = pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2') as Promise<FeatureExtractionPipeline>;
     return this.extractor;
   }
 }
 
-// --- HELPER FUNCTIONS ---
+// --- HELPER FUNCTIONS (No changes) ---
 const getRandomMessage = (messages: string[]) => messages[Math.floor(Math.random() * messages.length)];
-
-// CORRECTED Cosine Similarity function
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
     if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
-
-    // Cast the results from mathjs functions to 'number' to satisfy TypeScript
     const dotProduct = Number(dot(vecA, vecB));
     const normA = Number(norm(vecA));
     const normB = Number(norm(vecB));
-
-    if (normA === 0 || normB === 0) return 0; // Prevent division by zero
-
+    if (normA === 0 || normB === 0) return 0;
     return dotProduct / (normA * normB);
 }
 
-// --- MAIN QUERY PROCESSING FUNCTION (Optimized) ---
+// --- MAIN QUERY PROCESSING FUNCTION (FIXED) ---
 export async function processQuery(query: string): Promise<ChatbotResponse> {
   if (!query || query.trim() === '') return { introMessage: "Please ask me something..." };
 
@@ -84,21 +72,27 @@ export async function processQuery(query: string): Promise<ChatbotResponse> {
     const extractor = await AIModels.getExtractor();
     const candidateLabels = [...new Set(storesData.map(store => store.category))];
 
-    // --- AI Stage 1: Fast Category Classification (Run ONCE for performance) ---
-    const categoryResults: ZeroShotClassificationOutput = await classifier(query, candidateLabels, { multi_label: true });
+    // --- AI Stage 1: Fast Category Classification ---
+    const rawCategoryResults = await classifier(query, candidateLabels, { multi_label: true });
+
+    // --- FIX: Add a type guard to handle the array possibility ---
+    if (Array.isArray(rawCategoryResults)) {
+      // This is an unexpected state for a single query. We'll treat it as a failure.
+      throw new Error("Classifier returned an array for a single query string.");
+    }
+    const categoryResults: ZeroShotClassificationOutput = rawCategoryResults;
+    // After this check, TypeScript knows `categoryResults` is a single object.
+
     // Create a score map for O(1) lookups
     const categoryScores = new Map(categoryResults.labels.map((label, i) => [label, categoryResults.scores[i]]));
 
-    // --- AI Stage 2: Deep Semantic Analysis of User Query (Run ONCE) ---
+    // --- AI Stage 2: Deep Semantic Analysis of User Query ---
     const queryEmbeddingOutput = await extractor(query, { pooling: 'mean', normalize: true });
     const queryVector = Array.from(queryEmbeddingOutput.data);
 
-    // --- Scoring Logic: Combine both AI stages in a single, fast loop ---
+    // --- Scoring Logic (No changes) ---
     const scoredStores: StoreWithScore[] = storesData.map(store => {
-      // 1. Get the base score from the category filter.
       const categoryScore = categoryScores.get(store.category) || 0;
-      
-      // 2. Get the semantic relevance score by finding the best product match.
       let bestProductSimilarity = 0;
       for (const { embedding } of store.product_embeddings) {
           const similarity = cosineSimilarity(queryVector, embedding);
@@ -106,15 +100,13 @@ export async function processQuery(query: string): Promise<ChatbotResponse> {
               bestProductSimilarity = similarity;
           }
       }
-      
-      // 3. Combine scores. The semantic score heavily boosts the base category relevance.
       const finalScore = categoryScore * (1 + bestProductSimilarity);
       return { ...store, score: finalScore };
     });
 
-    // --- Filtering, Sorting, and Grouping ---
+    // --- Filtering, Sorting, and Grouping (No changes) ---
     const topStores = scoredStores
-      .filter(store => store.score > 0.5) // A fine-tuned threshold for relevance
+      .filter(store => store.score > 0.5)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
 
@@ -135,7 +127,7 @@ export async function processQuery(query: string): Promise<ChatbotResponse> {
       storeGroups: finalStoreGroups,
     };
   } catch (error) {
-    console.error("Error processing query:", error); // Keep for debugging, can be removed later
+    console.error("Error processing query:", error);
     return { introMessage: "I'm having a little trouble thinking right now. Please try again." };
   }
 }
