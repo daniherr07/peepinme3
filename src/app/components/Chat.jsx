@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { processQuery } from '../lib/chatbot.jss';
-import StoreCard from './StoreCard';
+import { processQuery } from '../lib/chatbot.jsx';
 import styles from './Chat.module.css';
 
 
