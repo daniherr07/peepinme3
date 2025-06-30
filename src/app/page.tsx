@@ -31,10 +31,6 @@ export default function Home() {
         </header>
 
         <Chat />
-
-        <footer className={styles.footer}>
-          <p>© {new Date().getFullYear()} PeepInMe. Pura Vida!</p>
-        </footer>
       </div>
     </main>
   )
