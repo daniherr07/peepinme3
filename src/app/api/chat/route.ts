@@ -1,16 +1,23 @@
+// --- 1. THE DEFINITIVE FIX FOR VERCEL DEPLOYMENT ---
+// This forces the API route to run in the full Node.js environment,
+// which is required by the @xenova/transformers library. This will solve the 405 error.
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 import { pipeline, ZeroShotClassificationPipeline, FeatureExtractionPipeline, ZeroShotClassificationOutput } from '@xenova/transformers';
 import { dot, norm } from 'mathjs';
 import storesData from '../../data/stores_with_embeddings.json';
 import { NextResponse } from 'next/server';
 
-// --- TYPE DEFINITIONS (Unchanged) ---
+// --- TYPE DEFINITIONS ---
 interface ProductEmbedding { product: string; embedding: number[]; }
 export interface Store { id: number; name: string; category: string; location: { province: string; city: string; }; product_embeddings: ProductEmbedding[]; product_types: string[]; hours: string; contact: string; }
 interface StoreWithScore extends Store { score: number; }
-export interface StoreGroup { category: string; stores: Store[]; }
+export interface StoreGroup { category:string; stores: Store[]; }
 export interface ChatbotResponse { introMessage: string; storeGroups?: StoreGroup[]; }
 
-// --- In-Memory Index (Unchanged) ---
+// --- In-Memory Index (For Performance) ---
+// This runs only once when the server starts.
 console.log("🚀 Building In-Memory Index...");
 const categoryIndex = (storesData as Store[]).reduce((index, store) => {
     if (!index.has(store.category)) index.set(store.category, []);
@@ -19,7 +26,7 @@ const categoryIndex = (storesData as Store[]).reduce((index, store) => {
 }, new Map<string, Store[]>());
 console.log(`✅ In-Memory Index built with ${categoryIndex.size} categories.`);
 
-// --- AI Model Management (Unchanged) ---
+// --- AI Model Management ---
 class AIModels {
     private static classifier: Promise<ZeroShotClassificationPipeline> | null = null;
     private static extractor: Promise<FeatureExtractionPipeline> | null = null;
@@ -33,7 +40,7 @@ class AIModels {
     }
 }
 
-// --- HELPER FUNCTIONS (Unchanged) ---
+// --- HELPER FUNCTIONS ---
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
     if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
     const dotProduct = Number(dot(vecA, vecB));
@@ -43,13 +50,14 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
     return dotProduct / (normA * normB);
 }
 
+// --- CORS HEADERS ---
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// --- MAIN API HANDLER (Updated with Type Fix) ---
+// --- MAIN API HANDLER for POST requests ---
 export async function POST(request: Request) {
     const startTime = Date.now();
     try {
@@ -57,32 +65,20 @@ export async function POST(request: Request) {
         console.log(`\n--- New Request ---`);
         console.log(`[${new Date().toISOString()}] ➡️ Received query: "${query}"`);
 
-        if (!query || typeof query !== 'string' || query.trim() === '') {
-            return NextResponse.json({ introMessage: "Please ask me something..." }, { status: 400, headers: corsHeaders });
-        }
-
         const classifier = await AIModels.getClassifier();
         const extractor = await AIModels.getExtractor();
         
-        // --- Algorithm Stage 1: AI Category Filtering ---
         const candidateLabels = Array.from(categoryIndex.keys());
-        
-        // ** THE FIX IS HERE **
-        // 1. Declare the result with the broader, correct type.
         const rawCategoryResults: ZeroShotClassificationOutput | ZeroShotClassificationOutput[] = await classifier(query, candidateLabels, { multi_label: true });
 
-        // 2. Use the type guard.
         if (Array.isArray(rawCategoryResults)) {
             throw new Error("Classifier returned an array for a single query, which is unexpected.");
         }
-        
-        // 3. Now it's safe to use the narrowed type.
         const categoryResults: ZeroShotClassificationOutput = rawCategoryResults;
         
         const categoryScores = new Map(categoryResults.labels.map((label, i) => [label, categoryResults.scores[i]]));
         console.log(`[LOG] AI Category Scores:`, categoryScores);
 
-        // ... a bunch of logic that is now correct ...
         const candidateStores: Store[] = [];
         for (const [category, score] of categoryScores.entries()) {
             if (score > 0.4) candidateStores.push(...(categoryIndex.get(category) || []));
@@ -91,7 +87,6 @@ export async function POST(request: Request) {
         console.log(`[LOG] Found ${uniqueCandidateStores.length} candidate stores from relevant categories.`);
         
         if (uniqueCandidateStores.length === 0) {
-            console.log(`[LOG] No relevant categories found. Sending fallback.`);
             return NextResponse.json({ introMessage: "I'm sorry, I couldn't find any stores related to that topic." }, { headers: corsHeaders });
         }
 
@@ -129,7 +124,6 @@ export async function POST(request: Request) {
         
         const endTime = Date.now();
         console.log(`[LOG] ✅ Response prepared in ${endTime - startTime}ms.`);
-        console.log(`---------------------`);
         return NextResponse.json(response, { headers: corsHeaders });
 
     } catch (error) {
@@ -138,6 +132,7 @@ export async function POST(request: Request) {
     }
 }
 
+// --- API HANDLER for OPTIONS requests (for CORS preflight) ---
 export async function OPTIONS(request: Request) {
     return new NextResponse(null, { headers: corsHeaders });
 }
