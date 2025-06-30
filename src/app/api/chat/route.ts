@@ -14,7 +14,6 @@ export interface StoreGroup { category: string; stores: Store[]; }
 export interface ChatbotResponse { introMessage: string; storeGroups?: StoreGroup[]; }
 
 // --- 1. PRE-COMPUTATION & IN-MEMORY INDEX ---
-// This code runs ONLY ONCE when the server starts.
 console.log("🚀 Building In-Memory Index...");
 const categoryIndex = (storesData as Store[]).reduce((index, store) => {
     if (!index.has(store.category)) {
@@ -26,7 +25,7 @@ const categoryIndex = (storesData as Store[]).reduce((index, store) => {
 console.log(`✅ In-Memory Index built with ${categoryIndex.size} categories.`);
 
 
-// --- AI MODEL MANAGEMENT (Singleton for the server) ---
+// --- AI MODEL MANAGEMENT (Unchanged) ---
 class AIModels {
     private static classifier: Promise<ZeroShotClassificationPipeline> | null = null;
     private static extractor: Promise<FeatureExtractionPipeline> | null = null;
@@ -50,7 +49,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
     return dotProduct / (normA * normB);
 }
 
-// --- MAIN API HANDLER (Optimized Algorithm) ---
+// --- MAIN API HANDLER (FIXED) ---
 export async function POST(request: Request) {
     const startTime = Date.now();
     try {
@@ -67,25 +66,33 @@ export async function POST(request: Request) {
         
         // --- Algorithm Stage 1: AI Category Filtering ---
         const candidateLabels = Array.from(categoryIndex.keys());
-        const categoryResults: ZeroShotClassificationOutput = await classifier(query, candidateLabels, { multi_label: true });
-        if (Array.isArray(categoryResults)) throw new Error("Classifier returned an array.");
-
+        
+        // --- FIX: Use a temporary variable and a type guard BEFORE strict assignment ---
+        const rawCategoryResults = await classifier(query, candidateLabels, { multi_label: true });
+        if (Array.isArray(rawCategoryResults)) {
+            // This is an unexpected state for a single query.
+            throw new Error("Classifier returned an array for a single query string.");
+        }
+        // Now that TypeScript knows it's not an array, we can safely assign it.
+        const categoryResults: ZeroShotClassificationOutput = rawCategoryResults;
+        
         const categoryScores = new Map(categoryResults.labels.map((label, i) => [label, categoryResults.scores[i]]));
         console.log(`[LOG] AI Category Scores:`, categoryScores);
 
-        // --- Algorithm Stage 2: Index-Based Candidate Selection (Near-Instant) ---
+        // --- Algorithm Stage 2: Index-Based Candidate Selection ---
         const candidateStores: Store[] = [];
         for (const [category, score] of categoryScores.entries()) {
-            if (score > 0.4) { // Confidence threshold
+            if (score > 0.4) {
                 candidateStores.push(...(categoryIndex.get(category) || []));
             }
         }
-        // Remove duplicates if a store fits multiple categories (unlikely but safe)
         const uniqueCandidateStores = [...new Map(candidateStores.map(item => [item['id'], item])).values()];
         console.log(`[LOG] Found ${uniqueCandidateStores.length} candidate stores from relevant categories.`);
         
         if (uniqueCandidateStores.length === 0) {
             console.log(`[LOG] No relevant categories found. Sending fallback.`);
+            const endTime = Date.now();
+            console.log(`[LOG] ✅ Response prepared in ${endTime - startTime}ms.`);
             return NextResponse.json({ introMessage: "I'm sorry, I couldn't find any stores related to that topic." });
         }
 
@@ -99,7 +106,6 @@ export async function POST(request: Request) {
                 const similarity = cosineSimilarity(queryVector, embedding);
                 if (similarity > bestProductSimilarity) bestProductSimilarity = similarity;
             }
-            // Use category score as base and boost with semantic similarity
             const finalScore = (categoryScores.get(store.category) || 0) * (1 + bestProductSimilarity);
             return { ...store, score: finalScore };
         });
