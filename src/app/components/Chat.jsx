@@ -8,7 +8,7 @@ import styles from './Chat.module.css';
 export default function Chat() {
 
   const handleSend = async () => {
-    const botResponse = await processQuery(input);
+    const botResponse = await processQuery("bababoe");
   };
   useEffect(() => {
     handleSend()
