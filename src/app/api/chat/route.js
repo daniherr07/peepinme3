@@ -1,6 +1,10 @@
 export async function POST(request) {
   try {
-    return Response.json(response)
+    return Response.json(
+      {
+        introMessage: "Hi",
+      }
+    )
   } catch (error) {
     console.error("API Route Error:", error)
     return Response.json(
