@@ -49,12 +49,6 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
     return dotProduct / (normA * normB);
 }
 
-// --- CORS HEADERS ---
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
 
 // --- MAIN API HANDLER for POST requests ---
 export async function POST(request: Request) {
@@ -86,7 +80,7 @@ export async function POST(request: Request) {
         console.log(`[LOG] Found ${uniqueCandidateStores.length} candidate stores from relevant categories.`);
         
         if (uniqueCandidateStores.length === 0) {
-            return Response.json({ introMessage: "I'm sorry, I couldn't find any stores related to that topic." }, { headers: corsHeaders });
+            return Response.json({ introMessage: "I'm sorry, I couldn't find any stores related to that topic." });
         }
 
         const queryEmbeddingOutput = await extractor(query, { pooling: 'mean', normalize: true });
@@ -123,10 +117,10 @@ export async function POST(request: Request) {
         
         const endTime = Date.now();
         console.log(`[LOG] ✅ Response prepared in ${endTime - startTime}ms.`);
-        return Response.json(response, { headers: corsHeaders });
+        return Response.json(response);
 
     } catch (error) {
         console.error("API Error:", error);
-        return Response.json({ introMessage: "I'm having a little trouble thinking right now. Please try again." }, { status: 500, headers: corsHeaders });
+        return Response.json({ introMessage: "I'm having a little trouble thinking right now. Please try again." }, { status: 500});
     }
 }
