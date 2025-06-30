@@ -7,7 +7,6 @@ export const dynamic = 'force-dynamic';
 import { pipeline, ZeroShotClassificationPipeline, FeatureExtractionPipeline, ZeroShotClassificationOutput } from '@xenova/transformers';
 import { dot, norm } from 'mathjs';
 import storesData from '../../data/stores_with_embeddings.json';
-import { NextResponse } from 'next/server';
 
 // --- TYPE DEFINITIONS ---
 interface ProductEmbedding { product: string; embedding: number[]; }
@@ -87,7 +86,7 @@ export async function POST(request: Request) {
         console.log(`[LOG] Found ${uniqueCandidateStores.length} candidate stores from relevant categories.`);
         
         if (uniqueCandidateStores.length === 0) {
-            return NextResponse.json({ introMessage: "I'm sorry, I couldn't find any stores related to that topic." }, { headers: corsHeaders });
+            return Response.json({ introMessage: "I'm sorry, I couldn't find any stores related to that topic." }, { headers: corsHeaders });
         }
 
         const queryEmbeddingOutput = await extractor(query, { pooling: 'mean', normalize: true });
@@ -124,15 +123,10 @@ export async function POST(request: Request) {
         
         const endTime = Date.now();
         console.log(`[LOG] ✅ Response prepared in ${endTime - startTime}ms.`);
-        return NextResponse.json(response, { headers: corsHeaders });
+        return Response.json(response, { headers: corsHeaders });
 
     } catch (error) {
         console.error("API Error:", error);
-        return NextResponse.json({ introMessage: "I'm having a little trouble thinking right now. Please try again." }, { status: 500, headers: corsHeaders });
+        return Response.json({ introMessage: "I'm having a little trouble thinking right now. Please try again." }, { status: 500, headers: corsHeaders });
     }
-}
-
-// --- API HANDLER for OPTIONS requests (for CORS preflight) ---
-export async function OPTIONS(request: Request) {
-    return new NextResponse(null, { headers: corsHeaders });
 }
