@@ -1,10 +1,8 @@
-import type { Store } from "../lib/chatbot"
 import styles from "./StoreCard.module.css"
 
 interface StoreCardProps {
-  store: Store
+  store: any
 }
-
 const StoreCard = ({ store }: StoreCardProps) => {
   return (
     <div className={styles.card}>

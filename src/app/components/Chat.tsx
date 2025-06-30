@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useState, useRef, useEffect } from 'react';
-import { processQuery, type StoreGroup } from '../lib/chatbot';
+import { processQuery } from '../lib/chatbot';
 import StoreCard from './StoreCard';
 import styles from './Chat.module.css';
 
@@ -11,7 +11,7 @@ interface Message {
   id: number;
   sender: 'user' | 'bot';
   text: string;
-  storeGroups?: StoreGroup[];
+  storeGroups?: any[]
 }
 
 export default function Chat() {
@@ -49,7 +49,6 @@ export default function Chat() {
       id: Date.now() + 1,
       sender: 'bot',
       text: botResponse.introMessage,
-      storeGroups: botResponse.storeGroups,
     };
     
     // Update state in two steps to ensure smooth UI transition
@@ -65,22 +64,7 @@ export default function Chat() {
             <div className={styles.message}>
               {/* Message text is now rendered directly */}
               <p>{msg.text}</p>
-
-              {/* Render the grouped store results */}
-              {msg.storeGroups && (
-                <div className={styles.storeGroupsContainer}>
-                  {msg.storeGroups.map((group) => (
-                    <div key={group.category}>
-                      <h4 className={styles.storeGroupHeader}>{group.category}</h4>
-                      <div className={styles.storesContainer}>
-                        {group.stores.map((store) => (
-                          <StoreCard key={store.id} store={store} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              
             </div>
           </div>
         ))}
