@@ -1,21 +1,13 @@
 'use client';
 
-import type React from 'react';
 import { useState, useRef, useEffect } from 'react';
-import { processQuery } from '../lib/chatbot';
+import { processQuery } from '../lib/chatbot.jss';
 import StoreCard from './StoreCard';
 import styles from './Chat.module.css';
 
-// The message interface remains the same
-interface Message {
-  id: number;
-  sender: 'user' | 'bot';
-  text: string;
-  storeGroups?: any[]
-}
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -35,17 +27,17 @@ export default function Chat() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMessage: Message = { id: Date.now(), sender: 'user', text: input };
+    const userMessage = { id: Date.now(), sender: 'user', text: input };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     const botResponse = await processQuery(input);
-    const botMessage: Message = {
+    const botMessage = {
       id: Date.now() + 1,
       sender: 'bot',
       text: botResponse.introMessage,
@@ -64,6 +56,8 @@ export default function Chat() {
             <div className={styles.message}>
               {/* Message text is now rendered directly */}
               <p>{msg.text}</p>
+
+              {/* Render the grouped store results */}
               
             </div>
           </div>

@@ -22,6 +22,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "next.config.ts", "src/app/api/chat/route.js", "src/app/lib/chatbot.js", "src/app/lib/ai-service.js"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "next.config.ts", "src/app/api/chat/route.js", "src/app/lib/chatbot.jss", "src/app/lib/ai-service.js", "src/app/components/Chat.jsx"],
   "exclude": ["node_modules"]
 }

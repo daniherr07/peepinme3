@@ -1,3 +1,5 @@
+
+
 export async function processQuery(query) {
   try {
     console.log(`[CLIENT] 🚀 Enviando consulta: "${query}"`)
@@ -31,7 +33,7 @@ export async function processQuery(query) {
     const result = await response.json()
     console.log(`[CLIENT] ✅ Respuesta recibida exitosamente`)
 
-    return result
+    return result 
   } catch (error) {
     console.error("[CLIENT] Error de red:", error)
     return {
