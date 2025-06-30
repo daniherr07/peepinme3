@@ -1,6 +1,3 @@
-// This is the new, HIGHLY OPTIMIZED server-side "brain" of the chatbot.
-// It uses pre-computed indexes for near-instant lookups.
-
 import { pipeline, ZeroShotClassificationPipeline, FeatureExtractionPipeline, ZeroShotClassificationOutput } from '@xenova/transformers';
 import { dot, norm } from 'mathjs';
 import storesData from '../../data/stores_with_embeddings.json';
@@ -13,19 +10,16 @@ interface StoreWithScore extends Store { score: number; }
 export interface StoreGroup { category: string; stores: Store[]; }
 export interface ChatbotResponse { introMessage: string; storeGroups?: StoreGroup[]; }
 
-// --- 1. PRE-COMPUTATION & IN-MEMORY INDEX ---
+// --- In-Memory Index (Unchanged) ---
 console.log("🚀 Building In-Memory Index...");
 const categoryIndex = (storesData as Store[]).reduce((index, store) => {
-    if (!index.has(store.category)) {
-        index.set(store.category, []);
-    }
+    if (!index.has(store.category)) index.set(store.category, []);
     index.get(store.category)!.push(store);
     return index;
 }, new Map<string, Store[]>());
 console.log(`✅ In-Memory Index built with ${categoryIndex.size} categories.`);
 
-
-// --- AI MODEL MANAGEMENT (Unchanged) ---
+// --- AI Model Management (Unchanged) ---
 class AIModels {
     private static classifier: Promise<ZeroShotClassificationPipeline> | null = null;
     private static extractor: Promise<FeatureExtractionPipeline> | null = null;
@@ -49,7 +43,13 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
     return dotProduct / (normA * normB);
 }
 
-// --- MAIN API HANDLER (FIXED) ---
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// --- MAIN API HANDLER (Updated with Type Fix) ---
 export async function POST(request: Request) {
     const startTime = Date.now();
     try {
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
         console.log(`[${new Date().toISOString()}] ➡️ Received query: "${query}"`);
 
         if (!query || typeof query !== 'string' || query.trim() === '') {
-            return NextResponse.json({ introMessage: "Please ask me something..." }, { status: 400 });
+            return NextResponse.json({ introMessage: "Please ask me something..." }, { status: 400, headers: corsHeaders });
         }
 
         const classifier = await AIModels.getClassifier();
@@ -67,36 +67,34 @@ export async function POST(request: Request) {
         // --- Algorithm Stage 1: AI Category Filtering ---
         const candidateLabels = Array.from(categoryIndex.keys());
         
-        // --- FIX: Use a temporary variable and a type guard BEFORE strict assignment ---
-        const rawCategoryResults = await classifier(query, candidateLabels, { multi_label: true });
+        // ** THE FIX IS HERE **
+        // 1. Declare the result with the broader, correct type.
+        const rawCategoryResults: ZeroShotClassificationOutput | ZeroShotClassificationOutput[] = await classifier(query, candidateLabels, { multi_label: true });
+
+        // 2. Use the type guard.
         if (Array.isArray(rawCategoryResults)) {
-            // This is an unexpected state for a single query.
-            throw new Error("Classifier returned an array for a single query string.");
+            throw new Error("Classifier returned an array for a single query, which is unexpected.");
         }
-        // Now that TypeScript knows it's not an array, we can safely assign it.
+        
+        // 3. Now it's safe to use the narrowed type.
         const categoryResults: ZeroShotClassificationOutput = rawCategoryResults;
         
         const categoryScores = new Map(categoryResults.labels.map((label, i) => [label, categoryResults.scores[i]]));
         console.log(`[LOG] AI Category Scores:`, categoryScores);
 
-        // --- Algorithm Stage 2: Index-Based Candidate Selection ---
+        // ... a bunch of logic that is now correct ...
         const candidateStores: Store[] = [];
         for (const [category, score] of categoryScores.entries()) {
-            if (score > 0.4) {
-                candidateStores.push(...(categoryIndex.get(category) || []));
-            }
+            if (score > 0.4) candidateStores.push(...(categoryIndex.get(category) || []));
         }
         const uniqueCandidateStores = [...new Map(candidateStores.map(item => [item['id'], item])).values()];
         console.log(`[LOG] Found ${uniqueCandidateStores.length} candidate stores from relevant categories.`);
         
         if (uniqueCandidateStores.length === 0) {
             console.log(`[LOG] No relevant categories found. Sending fallback.`);
-            const endTime = Date.now();
-            console.log(`[LOG] ✅ Response prepared in ${endTime - startTime}ms.`);
-            return NextResponse.json({ introMessage: "I'm sorry, I couldn't find any stores related to that topic." });
+            return NextResponse.json({ introMessage: "I'm sorry, I couldn't find any stores related to that topic." }, { headers: corsHeaders });
         }
 
-        // --- Algorithm Stage 3: Semantic Ranking on the SMALL SUBSET ---
         const queryEmbeddingOutput = await extractor(query, { pooling: 'mean', normalize: true });
         const queryVector = Array.from(queryEmbeddingOutput.data);
         
@@ -110,7 +108,6 @@ export async function POST(request: Request) {
             return { ...store, score: finalScore };
         });
 
-        // --- Final Filtering, Sorting, and Grouping ---
         const topStores = scoredStores.sort((a, b) => b.score - a.score).slice(0, 5);
         console.log(`[LOG] Top 5 stores after ranking:`, topStores.map(s => ({ name: s.name, score: s.score })));
 
@@ -133,10 +130,14 @@ export async function POST(request: Request) {
         const endTime = Date.now();
         console.log(`[LOG] ✅ Response prepared in ${endTime - startTime}ms.`);
         console.log(`---------------------`);
-        return NextResponse.json(response);
+        return NextResponse.json(response, { headers: corsHeaders });
 
     } catch (error) {
         console.error("API Error:", error);
-        return NextResponse.json({ introMessage: "I'm having a little trouble thinking right now. Please try again." }, { status: 500 });
+        return NextResponse.json({ introMessage: "I'm having a little trouble thinking right now. Please try again." }, { status: 500, headers: corsHeaders });
     }
+}
+
+export async function OPTIONS(request: Request) {
+    return new NextResponse(null, { headers: corsHeaders });
 }
